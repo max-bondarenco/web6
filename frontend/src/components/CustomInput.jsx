@@ -5,7 +5,7 @@ export default function CustomInput({ onChange, label, name }) {
     <div>
       <label>{label}</label>
       <input
-        step="0.1"
+        step="0.01"
         required
         onChange={onChange}
         name={name}

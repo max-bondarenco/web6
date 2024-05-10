@@ -1,52 +1,39 @@
 import catchAsync from '../utils/catchAsync.js';
-import { data } from '../consts/data.js';
-import max from '../utils/max.js';
-
-const calculate = (objects) => {
-  const result = {};
-  result.o = objects.reduce((acc, val) => acc + val.o, 0);
-  result.tr = objects.reduce((acc, val) => acc + val.o * val.tr, 0) / result.o;
-  result.ka = (result.o * result.tr) / 8760;
-  const kmax = max(objects, (a, b) => a.tc - b.tc).tc;
-  result.kp = (1.2 * kmax) / 8760;
-  return result;
-};
 
 export const calculateTask1 = catchAsync(async (req, res, next) => {
-  const {
-    line,
-    transformer,
-    switch1,
-    switch2,
-    sectionSwitch,
-    buses,
-    length,
-    Za,
-    Zp,
-  } = req.body;
+  const { Pa, o1, o2, C } = req.body;
+  const result = {};
 
-  const lineData = data.powerLines[line];
-  const transformerData = data.transformers[transformer];
-  const switch1Data = data.switches[switch1];
-  const switch2Data = data.switches[switch2];
-  const sectionSwitchData = data.switches[sectionSwitch];
-  const busData = data.bus;
-
-  const objects = [
-    { ...lineData, o: lineData.o * length },
-    transformerData,
-    switch1Data,
-    switch2Data,
-    { ...busData, o: busData.o * buses },
-  ];
-
-  const result = calculate(objects);
-  result.o2 = 2 * result.o * (result.ka + result.kp) + sectionSwitchData.o;
-
-  const transformerResult = calculate([transformerData]);
-  result.Ma = transformerResult.ka * 5120 * 6451;
-  result.Mp = transformerResult.kp * 5120 * 6451;
-  result.M = result.Ma * Za + result.Mp * Zp;
+  result.bW1 = findB(Pa, o1);
+  result.W1 = Pa * 24 * result.bW1;
+  result.I1 = result.W1 * C;
+  result.W2 = Pa * 24 * (1 - result.bW1);
+  result.B1 = result.W2 * C;
+  result.bW2 = findB(Pa, o2);
+  result.W3 = Pa * 24 * result.bW2;
+  result.I2 = result.W3 * C;
+  result.W4 = Pa * 24 * (1 - result.bW2);
+  result.B2 = result.W4 * C;
+  result.Income1 = result.I1 - result.B1;
+  result.Income2 = result.I2 - result.B2;
 
   res.status(200).json({ status: 'success', data: result });
 });
+
+const findB = (Pa, o) =>
+  integrate(
+    (p) =>
+      Math.exp(Math.pow(p - Pa, 2) / (2 * o * o)) /
+      (o * Math.sqrt(2 * Math.PI)),
+    Pa - Pa * 0.05,
+    +Pa + Pa * 0.05,
+    0.0001,
+  );
+
+const integrate = (func, lower, upper, step) => {
+  let sum = 0;
+  for (let x = lower; x <= upper; x += step) {
+    sum += func(x + step / 2) * step;
+  }
+  return sum;
+};
